@@ -327,7 +327,6 @@ void calcBkProj(
     // Initialize update with zeros
     std::fill(update.ptr(), update.ptr() + update.size(), 0.0);
     matrix.mapRows(myrange.start, myrange.end - myrange.start);
-    std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
 
     for (int row=myrange.start; row<myrange.end; ++row) {
         std::for_each(matrix.beginRow2(row), matrix.endRow2(row),

@@ -322,8 +322,9 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
 
 #ifndef MESSUNG
     laik_log(LAIK_LL_Info, "Starting %d MLEM Iterations\n", nIterations);
-#endif
+#else
     int flag = 0;
+#endif
     for (int iter=0; iter<nIterations; ++iter) {
 
         compute_time = std::chrono::duration<float>::zero();
@@ -419,8 +420,8 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
             laik_migrate_and_repartition(laik_get_active(norm), g2, 0);
             end = std::chrono::system_clock::now();
             elapsed_seconds = end - start;
-            flag = 1;
 #ifdef MESSUNG
+            flag = 1;
             printf("%d, %d, %lf, %lf, %lf, %lf\n",
                    -255,
                    -255,
