@@ -9,7 +9,7 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - Generators: Thorsten Fuchs
 
 ## Dependencies
-- [libbost 1.58] (http://boost.org/), for the iterators and program options.
+- [libb0ost 1.58](http://boost.org/), for the iterators and program options.
 - C++ 11, GNU Compiler
 - OpenMP Support
 - libconfig++
@@ -41,7 +41,7 @@ mpirun -np <num_tasks> ./mpicsr4mlem <matrix> <input> <output> <iterations> <che
 ```sh
 mpirun -np 4 ./mpicsr4mlem test.csr4 sino65536.sino mlem-60.out 60 0
 ```
-### Run the LAIK Version MPI Version
+### Run the LAIK Version
 ```sh
 mpirun -np <num_tasks> ./laikcsr4mlem <matrix> <input> <output> <iterations>
 ```
