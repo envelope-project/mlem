@@ -100,7 +100,6 @@ int main(int argc, char** argv) {
   int ret;
   Args args;
   CSR::CSR4Storer<float> storer;
-  CSR::CSR4Loader<float> loader;
 
   ret = processArgs(args, argc, argv);
   if(ret!=0) {
@@ -113,15 +112,15 @@ int main(int argc, char** argv) {
   cout << "Filename: " << args.filename << std::endl;
 
   CSR::CSR4<float> matrix;
-  CSR::CsrResult res;
-  res = loader.open(args.filename);
-  if(res != CSR::CSR_SUCCESS) {
-    std::cerr << "Error loading matrix!" << std::endl;
-    return EXIT_FAILURE;
-  }
-  res = loader.load(matrix);
+  CSR::CSR4GeneratorRand<float> csrgen;
 
-  storer.open(args.filename + "out");
+  std::cout << "Start Matrix Generation..." << std::endl;
+  csrgen.generate(matrix, args.config, args.density, args.variance);
+
+  std::cout << matrix.getNumRows() << std::endl;
+
+
+  storer.open(args.filename);
   storer.save(matrix);
 
   return EXIT_SUCCESS;

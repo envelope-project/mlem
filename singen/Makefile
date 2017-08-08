@@ -5,25 +5,14 @@ RM      = rm -f
 
 CXXFLAGS  = -Wall -std=c++11 -O3 -fstrict-aliasing
 LDFLAGS = 
-OMP_FLAGS = -fopenmp
 
+SOURCES = singen.cc
 
-SOURCES = $(wildcard *.cc)
-OBJECTS = $(SOURCES:%.cc=%.o)
-
-CXXFLAGS += $(OMP_FLAGS)
-
-#Libboost
-LDFLAGS += -lboost_program_options -lconfig++
-
-all: objs singen
+all: singen
 
 singen: $(OBJECTS)
-	$(CC) $(CXXFLAGS) $(DEFS) -o $@ $(OBJECTS) $(LDFLAGS)
-	
-objs: $(SOURCES)
-	$(CC) $(CXXFLAGS) $(DEFS) -c $^ $< 
+	$(CC) $(CXXFLAGS) $(DEFS) -o $@ $(SOURCES) $(LDFLAGS)
 
 clean:
-	- $(RM) *.o csr4gen singen
+	- $(RM) *.o singen
 
