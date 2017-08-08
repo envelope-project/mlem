@@ -61,3 +61,6 @@ Any publication using the MLEM code must be informed to the authors of this code
 
 ## License
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.
+
+## Acknowledgement
+This project is partially financed by project ENVELOPE, which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
