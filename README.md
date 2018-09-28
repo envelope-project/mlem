@@ -4,8 +4,9 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 
 ## Authors
 - Initial Verison and Algorithmic, MPI Version: Tilman Kuestner
-- LAIK Version, HPC Optimization: Josef Weidendorfer
-- LAIK Version, Measurements, HPC Optimizations: Dai Yang
+- LAIK Version, HPC Optimization: Josef Weidendorfer, Tilman Kuestner
+- LAIK Version, Measurements, HPC Optimizations: Dai Yang, Tilman Kuestner
+- The new Hybrid and OpenMP version: Rami Al-Rihawi
 - Generators: Thorsten Fuchs
 
 ## Dependencies
@@ -17,8 +18,11 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 
 ## Usage
 Different versions are supplied within this repository. 
-- mpicsr4mlem: the native MPI Version without LAIK support.
-- laikcsr4mlem: the LAIK version without repartitioning support. 
+- mpicsr4mlem: a hybrid MPI+OpenMP Version without LAIK support.
+- laikcsr4mlem: the LAIK version without repartitioning support and optimized load balancing
+- openmpcsr4mlem: a pure OpenMP Version of MLEM
+- openmpcsr4mlem-pin: OpenMP explicit thread pinned version of MLEM
+- openmpcsr4mlem-knl: Intel Knight's Landing Architecture optimized version of MLEM
 - laikcsr4mlem-repart: LAIK version with explicit repartitioning. 
 - csr4gen/csr4gen: The CSR (Compressed Sparse Rows) matrix generator. 
 - singen/singen: The sinogram (image raw data) generator. 
@@ -64,3 +68,4 @@ This code is distributed as a open source project under GPL License Version 3. P
 
 ## Acknowledgement
 This project is partially financed by project ENVELOPE, which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
+Development of the KNL and testing is partially funded by the Liebniz Supercomputing Centre 
