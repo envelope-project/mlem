@@ -1,29 +1,12 @@
-/**
-    Copyright © 2017 Tilman Kuestner
-    Authors: Tilman Kuestner
-           Dai Yang
-           Josef Weidendorfer
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
-    OTHER DEALINGS IN THE SOFTWARE.
-
-    The above copyright notice and this permission notice shall be 
-    included in all copies and/or substantial portions of the Software,
-    including binaries.
-*/
-
-#include "csr4matrix.hpp"
-#include "vector.hpp"
+#include "../include/csr4matrix.hpp"
+#include "../include/vector.hpp"
 
 extern "C" {
 #include "laik-backend-mpi.h"
+#include "laik-internal.h"
 }
+
+typedef unsigned int uint;
 
 // C++ additions to LAIK header
 inline Laik_DataFlow operator|(Laik_DataFlow a, Laik_DataFlow b)
@@ -37,6 +20,7 @@ inline Laik_DataFlow operator|(Laik_DataFlow a, Laik_DataFlow b)
 #include <cassert>
 #include <algorithm>
 #include <chrono>
+#include <unordered_map>
 #ifdef MESSUNG 
 #include <stdio.h>
 #endif
@@ -60,6 +44,20 @@ struct Range
 };
 
 
+struct SubRow
+{
+    int row;
+    int offset;
+};
+
+
+struct SubRowSlice
+{
+    SubRow from;
+    SubRow to;
+};
+
+
 ProgramOptions handleCommandLine(int argc, char *argv[])
 {
     if (argc != 5)
@@ -75,7 +73,7 @@ ProgramOptions handleCommandLine(int argc, char *argv[])
 }
 
 
-
+#if 0
 // For element-wise weighted partitioning: number of elems in row
 double getEW(Laik_Index* i, const void* d)
 {
@@ -86,39 +84,121 @@ double getEW(Laik_Index* i, const void* d)
     // Return (float) (m->row[ii + 1] - m->row[ii]);
     return m->elementsInRow(ii);
 }
+#endif
+
+struct RowData {
+    // local row index vector
+    std::vector<uint64_t> rowIdx;
+
+    // global row numbers
+    size_t fromRow;
+    size_t toRow;
+};
+
+struct Slice {
+    int64_t from;
+    int64_t to;
+};
+
+bool operator==(const Slice& lhs, const Slice& rhs) {
+    return lhs.from == rhs.from && lhs.to == rhs.to;
+}
+
+struct Hash
+{
+    std::size_t operator()(const Slice& s) const noexcept
+    {
+        std::size_t h1 = std::hash<uint64_t>{}(s.from);
+        std::size_t h2 = std::hash<uint64_t>{}(s.to);
+        return h1 ^ (h2 < 1);
+    }
+};
+
+std::unordered_map<Slice, RowData, Hash> cache;
 
 
-void calcColumnSums(Laik_Partitioning* p,
+RowData cache_get(const Csr4Matrix& matrix, const Slice& slice)
+{
+    auto search = cache.find(slice);
+    if (search != cache.end()) return search->second;
+
+    const uint32_t rowCount = matrix.rows();
+    const uint64_t* origRowIdx = matrix.getRowIdx();
+    
+    laik_log(2, "origRowIdx: %d %d %d %d %d", origRowIdx[0], origRowIdx[1], origRowIdx[2], origRowIdx[3], origRowIdx[4]);
+    
+    auto it = std::upper_bound(origRowIdx, origRowIdx + rowCount, slice.from);
+    
+    
+    
+    if (std::distance(origRowIdx, it) == 0) {
+        // Original row index vector is missing first element "0"
+        size_t fromRow = 0;
+        size_t toRow = std::distance(origRowIdx,
+            std::lower_bound(origRowIdx, origRowIdx + rowCount, slice.to - 1));
+        size_t len = toRow - fromRow + 2;
+        RowData rv = { std::vector<uint64_t>(len), fromRow, toRow };
+        std::copy(origRowIdx, origRowIdx + len - 1, std::begin(rv.rowIdx) + 1);
+        rv.rowIdx[0] = slice.from;
+        rv.rowIdx.back() = slice.to;
+        cache[slice] = rv;
+        return rv;
+    } // else
+
+    size_t fromRow = std::distance(origRowIdx, it);
+    size_t toRow = std::distance(origRowIdx,
+        std::upper_bound(origRowIdx, origRowIdx + rowCount, slice.to - 1));
+    size_t len = toRow - fromRow + 1;  // number of rows + 1
+    
+    laik_log(2, "origRowIdx: %p, it: %p", origRowIdx, it -1);
+   
+    laik_log(2, "Within %s: fromRow: %d, toRow %d, len %d", __FUNCTION__, fromRow, toRow, len);
+    RowData rv { std::vector<uint64_t>(len), fromRow, toRow };
+    std::copy(origRowIdx + fromRow, origRowIdx + fromRow + len - 1, std::begin(rv.rowIdx) + 1);
+    rv.rowIdx[0] = slice.from;
+    rv.rowIdx.back() = slice.to;
+    cache[slice] = rv;
+    return rv;
+}
+
+
+void calcColumnSums(Laik_Group* world,
+                    Laik_Partitioning* p,
                     const Csr4Matrix& matrix, Laik_Data* norm)
 {
-    laik_switchto_new(norm, laik_All,
-                      LAIK_DF_Init | LAIK_DF_ReduceOut | LAIK_DF_Sum);
+    //laik_switchto_partitioning(norm, pAll, LAIK_DF_Init, LAIK_RO_Sum);
+      laik_switchto_flow(norm, LAIK_DF_Init, LAIK_RO_Sum);
 
+    
     float* res;
     laik_map_def1(norm, (void**) &res, 0);
 
     // Loop over all local slices
-    for(int sNo = 0; ; sNo++) {
-        Laik_Slice* slc = laik_my_slice(p, sNo);
+
+    for (int sNo = 0; ; sNo++) {
+        Slice slice;
+        Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
         if (slc == 0) break;
 
-        auto fromRow = slc->from.i[0];
-        auto toRow = slc->to.i[0];
-        matrix.mapRows(fromRow, toRow - fromRow);
+        RowData rv = cache_get(matrix, slice);
+        auto fromRow = rv.fromRow;
+        auto toRow = rv.toRow;
+        matrix.mapRows(fromRow, toRow - fromRow + 1);
 
-        for(auto r = fromRow; r < toRow; r++) {
-            std::for_each(matrix.beginRow2(r), matrix.endRow2(r),
-                          [&](const RowElement<float>& e){ res[e.column()] += e.value(); });
+        for (size_t r = 0; r < rv.rowIdx.size() - 1; r++) {
+            std::for_each(matrix.beginRow(r, rv.rowIdx), matrix.endRow(r, rv.rowIdx),
+                [&](const RowElement<float>& e){ res[e.column()] += e.value();
+            });
         }
 
         float s = 0.0;
-        for(uint i = 0; i < matrix.columns(); i++) s += res[i];
+        for (uint i = 0; i < matrix.columns(); i++) s += res[i];
 #ifndef MESSUNG
         laik_log(LAIK_LL_Info, "Range %d - %d: Sum: %lf \n", fromRow, toRow, s);
 #endif
     }
 
-    laik_switchto_new(norm, laik_All, LAIK_DF_CopyIn);
+     laik_switchto_flow(norm, LAIK_DF_Preserve, LAIK_RO_Sum);
 
     laik_map_def1(norm, (void**) &res, 0);
 
@@ -150,7 +230,8 @@ void initImage(Laik_Data* norm, Vector<float>& image, const Vector<int>& lmsino)
 }
 
 
-void calcFwProj(Laik_Partitioning* p,
+void calcFwProj(Laik_Group* world,
+                Laik_Partitioning* p,
                 const Csr4Matrix& matrix,
                 const Vector<float>& input,
                 Laik_Data* result,
@@ -158,9 +239,10 @@ void calcFwProj(Laik_Partitioning* p,
                 std::chrono::duration<float>& total_time
                 )
 {
-    laik_switchto_new(result, laik_All,
-                      LAIK_DF_Init | LAIK_DF_ReduceOut | LAIK_DF_Sum);
-
+    //laik_switchto_new_phase(result, world, laik_All,LAIK_DF_Init | LAIK_DF_ReduceOut | LAIK_DF_Sum);
+    //laik_switchto_partitioning(result, pAll, LAIK_DF_Init, LAIK_RO_Sum);
+     laik_switchto_flow(result, LAIK_DF_Init, LAIK_RO_Sum);
+    
     std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> s_comp, s_comp_end, fin;
 
@@ -169,24 +251,70 @@ void calcFwProj(Laik_Partitioning* p,
 
     // Loop over all local slices
     for(int sNo = 0; ; sNo++) {
-        Laik_Slice* slc = laik_my_slice(p, sNo);
+
+        //Slice slice;
+        //Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
+        //Laik_TaskSlice* slc = laik_phase_myslice_1d(ap, sNo, &slice.from, &slice.to);
+        
+        Slice slice;
+        Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
+        
+        laik_log(2, "My Slice: from %d, to %d", slice.from, slice.to);
+
+
         if (slc == 0) break;
 
-        auto fromRow = slc->from.i[0];
-        auto toRow = slc->to.i[0];
-        matrix.mapRows(fromRow, toRow - fromRow);
+        RowData rv = cache_get(matrix, slice);
+        auto fromRow = rv.fromRow;
+        auto toRow = rv.toRow;
+        matrix.mapRows(fromRow, toRow - fromRow + 1);
+        laik_log(2, "My Slice: from %d, to %d", fromRow, toRow);
+
 
         s_comp = std::chrono::system_clock::now();
 
-        for(auto r = fromRow; r < toRow; r++) {
-            std::for_each(matrix.beginRow2(r), matrix.endRow2(r),
-                          [&](const RowElement<float>& e){ res[r] += (float)e.value() * input[e.column()]; });
+        for(size_t r = 0; r < rv.rowIdx.size() - 1; r++) {
+            std::for_each(matrix.beginRow(r, rv.rowIdx), matrix.endRow(r, rv.rowIdx),
+                [&](const RowElement<float>& e){ res[r + fromRow] += (float)e.value() * input[e.column()]; });
+            if (r<100 ) laik_log(2, "index: %d, value:%f", r+fromRow, res[r+fromRow]);
         }
+
         s_comp_end = std::chrono::system_clock::now();
         comp_time += (s_comp_end - s_comp);
     }
 
-    laik_switchto_new(result, laik_All, LAIK_DF_CopyIn);
+    //laik_switchto_new_phase(result, world, laik_All, LAIK_DF_CopyIn);
+    //laik_switchto_partitioning(result, pAll, LAIK_DF_Preserve, LAIK_RO_Sum);
+         laik_switchto_flow(result, LAIK_DF_Preserve, LAIK_RO_Sum);
+
+
+
+    for(int sNo = 0; ; sNo++) {
+
+        //Slice slice;
+        //Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
+        //Laik_TaskSlice* slc = laik_phase_myslice_1d(ap, sNo, &slice.from, &slice.to);
+        
+        Slice slice;
+        Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
+        
+        if (slc == 0) break;
+
+        RowData rv = cache_get(matrix, slice);
+        auto fromRow = rv.fromRow;
+        auto toRow = rv.toRow;
+        matrix.mapRows(fromRow, toRow - fromRow + 1);
+
+        laik_map_def1(result, (void**) &res, 0);
+
+
+        for(size_t r = 0; r < rv.rowIdx.size() - 1; r++) {
+            if (r<100 ) laik_log(2, "index: %d, value:%f", r, res[r+fromRow]);
+        }
+    }
+
+        
+    
     fin = std::chrono::system_clock::now();
     total_time += (fin - start);
 }
@@ -218,16 +346,21 @@ void calcCorrel(
 }
 
 
-void calcBkProj(Laik_Partitioning* p,
+void calcBkProj(Laik_Group* world,
+                Laik_Partitioning* p, 
                 const Csr4Matrix& matrix,
                 const Vector<float>& correlation,
                 Laik_Data* update,
                 std::chrono::duration<float>& comp_time,
                 std::chrono::duration<float>& total_time)
 {
-    laik_switchto_new(update, laik_All,
-                      LAIK_DF_Init | LAIK_DF_ReduceOut | LAIK_DF_Sum);
+    //laik_switchto_new_phase(update, world, laik_All,
+     //                 LAIK_DF_Init | LAIK_DF_ReduceOut | LAIK_DF_Sum);
+    
+    //laik_switchto_partitioning(update, pAll, LAIK_DF_Init, LAIK_RO_Sum);
+     laik_switchto_flow(update, LAIK_DF_Init, LAIK_RO_Sum);
 
+    
     float* res;
     std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> s_comp, s_comp_end,fin;
@@ -236,25 +369,34 @@ void calcBkProj(Laik_Partitioning* p,
 
     // Loop over all local slices
     for(int sNo = 0; ; sNo++) {
-        Laik_Slice* slc = laik_my_slice(p, sNo);
+
+        //Slice slice;
+        //Laik_TaskSlice* slc = laik_phase_myslice_1d(ap, sNo, &slice.from, &slice.to);
+        
+        Slice slice;
+        Laik_TaskSlice* slc = laik_my_slice_1d(p, sNo, &slice.from, &slice.to);
+        
         if (slc == 0) break;
 
-        auto fromRow = slc->from.i[0];
-        auto toRow = slc->to.i[0];
-        matrix.mapRows(fromRow, toRow - fromRow);
+        RowData rv = cache_get(matrix, slice);
+        auto fromRow = rv.fromRow;
+        auto toRow = rv.toRow;
+        matrix.mapRows(fromRow, toRow - fromRow + 1);
 
         s_comp = std::chrono::system_clock::now();
 
-        for(auto r = fromRow; r < toRow; r++) {
-            std::for_each(matrix.beginRow2(r), matrix.endRow2(r),
-                          [&](const RowElement<float>& e){ res[e.column()] += (float)e.value() * correlation[r]; });
+        for (size_t r = 0; r < rv.rowIdx.size() - 1; r++) {
+            std::for_each(matrix.beginRow(r, rv.rowIdx), matrix.endRow(r, rv.rowIdx),
+                [&](const RowElement<float>& e){ res[e.column()] += (float)e.value() * correlation[r + fromRow]; });
         }
+
         s_comp_end = std::chrono::system_clock::now();
         comp_time += (s_comp_end - s_comp);
     }
 
 
-    laik_switchto_new(update, laik_All, LAIK_DF_CopyIn);
+    //laik_switchto_partitioning(update, pAll, LAIK_DF_Preserve, LAIK_RO_Sum);
+         laik_switchto_flow(update, LAIK_DF_Preserve, LAIK_RO_Sum);
 
     fin = std::chrono::system_clock::now();
     total_time += (fin - start);
@@ -286,7 +428,7 @@ void calcUpdate(
 }
 
 
-void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
+void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* p,
           const Csr4Matrix& matrix, const Vector<int>& lmsino,
           Vector<float>& image, int nIterations)
 {
@@ -294,18 +436,26 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
     uint32_t nColumns = matrix.columns();
     std::chrono::duration<float> compute_time, total_time;
 
-
     // Allocate temporary vectors
-    Laik_Data* fwproj = laik_alloc_1d(world, laik_Float, nRows);
+    Laik_Data* fwproj = laik_new_data_1d(inst, laik_Float, nRows);
+    laik_data_set_name (fwproj, "fwProj");
+    laik_switchto_new_partitioning(fwproj, world, laik_All, LAIK_DF_None, LAIK_RO_None);
+    
     Vector<float> correlation(nRows, 0.0); // could update vector fwproj instead
     //Vector<float> update(nColumns, 0.0);
-    Laik_Data* update = laik_alloc_1d(world, laik_Float, nColumns);
+    Laik_Data* update = laik_new_data_1d(inst, laik_Float, nColumns);
+    laik_data_set_name(update, "update");
+    laik_switchto_new_partitioning(update, world, laik_All, LAIK_DF_None, LAIK_RO_None);
+
 
     // Calculate column sums ("norm")
-    Laik_Data* norm = laik_alloc_1d(world, laik_Float, nColumns);
+    Laik_Data* norm = laik_new_data_1d(inst, laik_Float, nColumns);
+    laik_data_set_name(norm, "norm");
+    laik_switchto_new_partitioning(norm, world, laik_All, LAIK_DF_None, LAIK_RO_None);
+
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
-    calcColumnSums(part, matrix, norm);
+    calcColumnSums(world, p, matrix, norm);
     end = std::chrono::system_clock::now();
     std::chrono::duration<float> elapsed_seconds = end - start;
 
@@ -324,9 +474,9 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
         compute_time = std::chrono::duration<float>::zero();
         total_time = std::chrono::duration<float>::zero();
         
-        calcFwProj(part, matrix, image, fwproj, compute_time, total_time);
+        calcFwProj(world, p, matrix, image, fwproj, compute_time, total_time);
         calcCorrel(fwproj, lmsino, correlation, compute_time, total_time);
-        calcBkProj(part, matrix, correlation, update, compute_time, total_time);
+        calcBkProj(world, p, matrix, correlation, update, compute_time, total_time);
         calcUpdate(update, norm, image, compute_time, total_time);
 
         // Debug: sum over image values
@@ -357,6 +507,54 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
 }
 
 
+void mlemPartitioner(Laik_Partitioner* pr,
+                     Laik_Partitioning* p, Laik_Partitioning* oldP)
+{
+    // Laik_Space* space = ba->space;  // unused
+    Laik_Group* g = p->group;
+    Csr4Matrix* mtx = static_cast<Csr4Matrix*>(pr->data);
+
+    int sliceCount = g->size;
+    uint64_t elementsPerSlice = (mtx->elements() + sliceCount - 1) / sliceCount;
+    uint64_t elementCount = 0;
+    uint64_t task = 0;
+
+    SubRowSlice* slice_data = new SubRowSlice[sliceCount];  // FIXME memory leak
+
+    Laik_Slice sl;
+    sl.from = { 0, 0, 0 }; // Laik_Index
+    sl.to = { 0, 0, 0, };
+
+    int startRow = 0;
+    int startOffset = 0;
+
+    for (uint32_t row = 0; row < mtx->rows(); ++row) {
+        elementCount += mtx->elementsInRow(row);
+        if (elementCount >= sl.from.i[0] + elementsPerSlice) {
+            sl.to.i[0] = std::min(sl.from.i[0] + elementsPerSlice, mtx->elements());
+
+            uint32_t offset = sl.from.i[0] + elementsPerSlice - elementCount + mtx->elementsInRow(row);
+
+            slice_data[task].from.row = startRow;
+            slice_data[task].from.offset = startOffset;
+            slice_data[task].to.row = row;
+            slice_data[task].to.offset = offset;
+
+            if (offset == mtx->elementsInRow(row)) {
+                slice_data[task].to.row = row + 1;
+                slice_data[task].to.offset = 0;
+            }
+
+            laik_append_slice(p, task, &sl, 0, (void*)&slice_data[task]);
+            ++task;
+            sl.from = sl.to;
+            startRow = row;
+            startOffset = offset;
+        }
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
     ProgramOptions progops = handleCommandLine(argc, argv);
@@ -367,6 +565,8 @@ int main(int argc, char *argv[])
     std::cout << "Iterations: " << progops.iterations << std::endl;
 #endif
     Csr4Matrix matrix(progops.mtxfilename);
+    //Csr4Matrix matrix = Csr4Matrix::testMatrix();
+
 #ifndef MESSUNG
     std::cout << "Matrix rows (LORs): " << matrix.rows() << std::endl;
     std::cout << "Matrix cols (VOXs): " << matrix.columns() << std::endl;
@@ -378,14 +578,12 @@ int main(int argc, char *argv[])
     Laik_Group* world = laik_world(inst);
 
     laik_enable_profiling(inst);
-    // 1d space for matrix rows with weighted block partitioning
-    Laik_Space* space;
-    Laik_Partitioner* part;
-    Laik_Partitioning* p;
-    space = laik_new_space_1d(inst, matrix.rows());
-    
-    part = laik_new_block_partitioner_iw1(getEW, &matrix);
-    p = laik_new_partitioning(world, space, part);
+
+    // 1d space, block partitioning of matrix elements
+    Laik_Space* space = laik_new_space_1d(inst, matrix.elements());
+    Laik_Partitioner* part = laik_new_block_partitioner1();
+    Laik_Partitioning* p = laik_new_partitioning(part, world, space, 0);
+    //Laik_AccessPhase* ap = laik_new_accessphase(world, space, part, nullptr);
 
     mlem(inst, world, p, matrix, lmsino, image, progops.iterations);
 

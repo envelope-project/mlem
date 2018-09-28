@@ -1,0 +1,3 @@
+[submodule "laik"]
+	path = laik
+	url = https://github.com/envelope-project/laik

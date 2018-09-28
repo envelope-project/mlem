@@ -1,25 +1,12 @@
-/**
-    Copyright © 2017 Tilman Kuestner
-    Authors: Tilman Kuestner
-           Dai Yang
-           Josef Weidendorfer
+#define _LARGEFILE64_SOURCE
+#ifndef __APPLE__
+#include <xmmintrin.h>
+#else
+#include <fenv.h>
+#endif
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
-    OTHER DEALINGS IN THE SOFTWARE.
-
-    The above copyright notice and this permission notice shall be 
-    included in all copies and/or substantial portions of the Software,
-    including binaries.
-*/
-
-#include "csr4matrix.hpp"
-#include "vector.hpp"
+#include "../include/csr4matrix.hpp"
+#include "../include/vector.hpp"
 
 #include <iostream>
 #include <string>
@@ -34,18 +21,15 @@
 
 #include <mpi.h>
 
+
+/*
+ * Compiler Switches
+ * MESSUNG -> Supress human readable output and enable csv. generation
+ */
+
 #define IMG_CHECKPOINT_NAME "img.chkpt"
 #define ITER_CHECKPOINT_NAME "iter.chkpt"
-
-
-double wtime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-
-    return tv.tv_sec+1e-6*tv.tv_usec;
-}
-
+#define CHKPNT_INTEVALL 5
 
 struct ProgramOptions
 {
@@ -70,13 +54,44 @@ struct Range
     int end;
 };
 
+/** 
+ * @brief  Simple Time Measurement Function
+ * @note   This function should not be called very often since gettimeofday ()
+ * is quite expensive. Can be also changed to other time implementation such 
+ * as walltime.
+ * 
+ * @retval Current Real Time
+ */
+double wtime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+
+    return tv.tv_sec+1e-6*tv.tv_usec;
+}
+
+/** 
+ * @brief  Check if a file exists. 
+ * @note   
+ * @param  name: The file name.
+ * @retval true, if file exists. Otherwise false. 
+ */
 inline 
 bool exists(const std::string& name){
     struct stat buffer;
     return (stat(name.c_str(), &buffer) == 0);
 }
 
-
+/** 
+ * @brief  Create a checkpoint for the given MLEM code.
+ * @note   
+ * @param  mpi: the MPI Control structure
+ * @param  image: Image vector
+ * @param  iter: current iteration number
+ * @param  img_chkpt_name: checkpoint file name for image vector
+ * @param  iter_chkpt_name: checkpoint file name for the iteration number
+ * @retval None
+ */
 void checkPointNow(
         const MpiData& mpi,
         Vector<float>& image,
@@ -88,6 +103,7 @@ void checkPointNow(
         return;
     }
 
+    // Use the synchonous version to ensure that the file is flush
     image.writeToFileSync(img_chkpt_name);
 
     std::ofstream myfile(iter_chkpt_name,
@@ -100,10 +116,20 @@ void checkPointNow(
     myfile.write(reinterpret_cast<char*>(&iter), sizeof(int));
     myfile.flush();
     
+    //The fsync() is required to ensure the file flush. 
     fsync(image.GetFd(*myfile.rdbuf()));
     myfile.close();
 }
 
+/** 
+ * @brief Restore working vectors from a given checkpoint
+ * @note   
+ * @param  image: reference to the image vector
+ * @param  img_chkpt_name: name to the image vector checkpoint file
+ * @param  iter: reference to the iteration vector
+ * @param  iter_chkpt_name: name to the iteration vector file name
+ * @retval None
+ */
 void restore(
         Vector<float>& image,
         const std::string& img_chkpt_name,
@@ -127,6 +153,13 @@ void restore(
     myFile.close();
 }
 
+/** 
+ * @brief  Simple Commandline Options Handler
+ * @note   
+ * @param  argc: 
+ * @param  *argv[]: 
+ * @retval 
+ */
 ProgramOptions handleCommandLine(int argc, char *argv[])
 {
     if (argc != 6)
@@ -141,7 +174,13 @@ ProgramOptions handleCommandLine(int argc, char *argv[])
     return progops;
 }
 
-
+/** 
+ * @brief  Simple implementation to initialize MPI Communication
+ * @note   
+ * @param  argc: 
+ * @param  *argv[]: 
+ * @retval 
+ */
 MpiData initializeMpi(int argc, char *argv[])
 {
     MpiData mpi;
@@ -153,7 +192,13 @@ MpiData initializeMpi(int argc, char *argv[])
     return mpi;
 }
 
-
+/** 
+ * @brief  Simple Partitioner
+ * @note   This partiitoner operates on the number of NZs per row. 
+ * @param  mpi: the MPI data structure
+ * @param  matrix: the input sparse matrix
+ * @retval a range of on which the current MPI rank should work on. s
+ */
 std::vector<Range> partition(
         const MpiData& mpi,
         const Csr4Matrix& matrix)
@@ -188,7 +233,15 @@ std::vector<Range> partition(
     return ranges;
 }
 
-
+/** 
+ * @brief Calculate Column vector sum. 
+ * @note  This is used to initialize the MLEM calculation. 
+ * @param  mpi: The MPI structure
+ * @param  ranges: my ranges
+ * @param  matrix: system matrix
+ * @param  norm: vector to store the norm
+ * @retval None
+ */
 void calcColumnSums(const MpiData& mpi, const std::vector<Range>& ranges,
                     const Csr4Matrix& matrix, Vector<float>& norm)
 {
@@ -206,7 +259,7 @@ void calcColumnSums(const MpiData& mpi, const std::vector<Range>& ranges,
 
 #ifndef MESSUNG
     float s = 0.0;
-    for(uint i = 0; i < matrix.columns(); i++) s += norm[i];
+    for(unsigned i = 0; i < matrix.columns(); i++) s += norm[i];
     std::cout << "MLEM [" << mpi.rank << "/" << mpi.size << "]:" <<
                  "Range " << myrange.start << "-" << myrange.end << ": " << s <<std::endl;
 #endif
@@ -214,13 +267,21 @@ void calcColumnSums(const MpiData& mpi, const std::vector<Range>& ranges,
 
 #ifndef MESSUNG
     s = 0.0;
-    for(uint i = 0; i < matrix.columns(); i++) s += norm[i];
+    for(unsigned i = 0; i < matrix.columns(); i++) s += norm[i];
     std::cout << "Sum: " << std::setprecision(10) << s << std::endl;
     //norm.writeToFile("norm-0.out");
 #endif
 }
 
-
+/** 
+ * @brief  Initialize the image vector
+ * @note   The initial estimate is a uniform grey picture
+ * @param  mpi: MPI Strucuture
+ * @param  norm: the norm vector
+ * @param  image: image vector
+ * @param  lmsino: sinogram (input) vector
+ * @retval None
+ */
 void initImage(
         const MpiData& mpi,
         const Vector<float>& norm,
@@ -244,7 +305,20 @@ void initImage(
     for (size_t i=0; i<image.size(); ++i) image[i] = initial;
 }
 
-
+/** 
+ * @brief  Calculate the forward projection.
+ * @note   The inner for loop can also be operated using OpenMP Parallelization
+ * In addition, there is no random access here into the system Matrix if the matix
+ * is partitioned row-wise. Also, a MPI allReduce is used here. 
+ * @param  mpi: MPI Structure
+ * @param  ranges: my ranges
+ * @param  matrix: system matrix
+ * @param  input: input vector (sinogram)
+ * @param  result: output vector
+ * @param  comp_time: time and performace measurement facility
+ * @param  total_time: 
+ * @retval None
+ */
 void calcFwProj(
         const MpiData& mpi,
         const std::vector<Range>& ranges,
@@ -280,13 +354,26 @@ void calcFwProj(
     tv2 = wtime();
     *comp_time += tv2-tv1;
 
+    std::cout << ", calcFwProj"
+    << " Compute Time: " << tv2-tv1 << "s"
+    << std::endl;
+
     MPI_Allreduce(MPI_IN_PLACE, result.ptr(), result.size(), MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     
     tv2 = wtime();
     *total_time += tv2-tv1;
 }
 
-
+/** 
+ * @brief  Calculate the correlation vector
+ * @note   
+ * @param  fwproj: The result from forward projection
+ * @param  input: sinogram 
+ * @param  correlation: vector to store correlation
+ * @param  *comp_time: Performance analytics facility
+ * @param  *total_time: 
+ * @retval None
+ */
 void calcCorrel(
         const Vector<float>& fwproj,
         const Vector<int>& input,
@@ -303,12 +390,29 @@ void calcCorrel(
         correlation[i] = (fwproj[i] != 0.0) ? (input[i] / fwproj[i]) : 0.0;
     
     tv2 = wtime();
+    std::cout << ", calcCorrel"
+    << " Compute Time: " << tv2-tv1 << "s"
+    << std::endl;
+
     *comp_time += tv2-tv1;
-    
     *total_time += tv2-tv1;
 }
 
-
+/** 
+ * @brief  Calculate the Backward projection
+ * @note   The Backward projection cannot be simple converted to OpenMP, due 
+ * to potential race condition (use atomic/critical/reduction). In addition, 
+ * in a row-wise partitioning, random access into memory is implied.  A MPI 
+ * allReduce is also triggered at the end of this function. 
+ * @param  mpi: the MPI structure.
+ * @param  ranges: my ranges
+ * @param  matrix: system matrix
+ * @param  correlation: correlation vector (result form last step)
+ * @param  update: results form this function 
+ * @param  comp_time: performance analytics
+ * @param  total_time: 
+ * @retval None
+ */
 void calcBkProj(
         const MpiData& mpi,
         const std::vector<Range>& ranges,
@@ -327,7 +431,7 @@ void calcBkProj(
     // Initialize update with zeros
     std::fill(update.ptr(), update.ptr() + update.size(), 0.0);
     matrix.mapRows(myrange.start, myrange.end - myrange.start);
-
+    
     for (int row=myrange.start; row<myrange.end; ++row) {
         std::for_each(matrix.beginRow2(row), matrix.endRow2(row),
                       [&](const RowElement<float>& e){ update[e.column()] += (float)e.value() * correlation[row]; });
@@ -335,6 +439,10 @@ void calcBkProj(
 
     tv2 = wtime();
     *comp_time += tv2-tv1;
+
+    std::cout << ", calcBkProj"
+    << " Compute Time: " << tv2-tv1 << "s"
+    << std::endl;
     
     MPI_Allreduce(MPI_IN_PLACE, update.ptr(), update.size(), MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     
@@ -343,7 +451,16 @@ void calcBkProj(
     *total_time += tv2-tv1;
 }
 
-
+/** 
+ * @brief  calculate the update to the image vector
+ * @note   
+ * @param  update: the update to be applied on the image vector
+ * @param  norm: the norm vector
+ * @param  image: image vector
+ * @param  comp_time: performance analytics facilities
+ * @param  total_time: 
+ * @retval None
+ */
 void calcUpdate(
         const Vector<float>& update,
         const Vector<float>& norm,
@@ -362,12 +479,27 @@ void calcUpdate(
     
     tv2 = wtime();
 
+    std::cout << ", calcUpdate"
+    << " Compute Time: " << tv2-tv1 << "s"
+    << std::endl;
+
     *comp_time += tv2-tv1;
     
     *total_time += tv2-tv1;
 }
 
-
+/** 
+ * @brief  Main MLEM function. 
+ * @note   
+ * @param  mpi: MPI Sturcture
+ * @param  ranges: my ranges
+ * @param  matrix: system matrix
+ * @param  lmsino: sinogram vector (input)
+ * @param  image: image vector (output)
+ * @param  nIterations: number of iterations
+ * @param  checkpointing: Indicator for Checkpointing
+ * @retval None
+ */
 void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
           const Csr4Matrix& matrix, const Vector<int>& lmsino,
           Vector<float>& image, int nIterations, int checkpointing)
@@ -378,6 +510,8 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
 
     double compute_time, total_time;
 
+    int chkpt_int = 0;
+
     // Allocate temporary vectors
     Vector<float> fwproj(nRows, 0.0);
     Vector<float> correlation(nRows, 0.0);
@@ -385,18 +519,24 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
 
     // Calculate column sums ("norm")
     Vector<float> norm(nColumns, 0.0);
+
     std::chrono::time_point<std::chrono::system_clock> start, end, buffer_time, b2_time;
     start = std::chrono::system_clock::now();
+
     calcColumnSums(mpi, ranges, matrix, norm);
+
     end = std::chrono::system_clock::now();
     std::chrono::duration<float> elapsed_seconds = end - start;
 #ifndef MESSUNG
     std::cout << "MLEM [" << mpi.rank << "/" << mpi.size << "]:"
               << "Calculated norm, elapsed time: " << elapsed_seconds.count() << "s\n";
 #endif    
-    // Checkpointing
+
+    // Decide whether restart from checkpoint or fill intial estimates
     if(exists(IMG_CHECKPOINT_NAME) && exists(ITER_CHECKPOINT_NAME)){
+
         restore(image, IMG_CHECKPOINT_NAME, iter_alt, ITER_CHECKPOINT_NAME);
+
 #ifndef MESSUNG
         std::cout << "MLEM [" << mpi.rank << "/" << mpi.size << "]:"
                   << "I got Checkpoint at iternation " << iter_alt << "\n";
@@ -416,10 +556,12 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
               << "Starting " << nIterations-iter_alt << " MLEM iterations" << std::endl;
 #endif
 
+    // Beginning of the Main MLEM Loop
     for (int iter = iter_alt; iter<nIterations; ++iter) {
         compute_time = 0.;
         total_time = 0.;
 
+        // Kernel
         calcFwProj(mpi, ranges, matrix, image, fwproj, &compute_time, &total_time);
         calcCorrel(fwproj, lmsino, correlation, &compute_time, &total_time);
         calcBkProj(mpi, ranges, matrix, correlation, update, &compute_time, &total_time);
@@ -427,7 +569,7 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
 
         // Debug: sum over image values
         float s = 0.0;
-        for(uint i = 0; i < matrix.columns(); i++) s += image[i];
+        for(unsigned i = 0; i < matrix.columns(); i++) s += image[i];
 #ifndef MESSUNG
         std::cout << "MLEM [" << mpi.rank << "/" << mpi.size << "]: Iter: "
                   << iter + 1 << ", "
@@ -445,9 +587,14 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
 #endif
         // Calculate time consumed for chkpointing
         if(checkpointing==1 && mpi.rank == 0){
-            
             double tv1, tv2;
             double tchk;
+
+            if(chkpt_int != CHKPNT_INTEVALL){
+                chkpt_int++;
+                continue;
+            }
+
             tv1 = wtime();
             checkPointNow(
                         mpi,
@@ -465,6 +612,7 @@ void mlem(const MpiData& mpi, const std::vector<Range>& ranges,
 #else
             printf("-255, %lf\n", tchk);
 #endif
+        chkpt_int = 0;
         }
         
     }
@@ -492,6 +640,12 @@ int main(int argc, char *argv[])
     auto mpi = initializeMpi(argc, argv);
 
     auto ranges = partition(mpi, matrix);
+
+    #ifndef __APPLE__
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);    
+    #else
+    fesetenv(FE_DFL_DISABLE_SSE_DENORMS_ENV);
+    #endif
 
     mlem(mpi, ranges, matrix, lmsino, image, progops.iterations, progops.checkpointing);
 
