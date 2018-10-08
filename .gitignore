@@ -1,2 +1,8 @@
 *.DS_Store
 *.o
+/laikcsr4mlem
+/laikcsr4mlem-repart
+/mpicsr4mlem
+/mpicsr4mlem2
+/openmpcsr4mlem
+*.dSYM/

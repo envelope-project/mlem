@@ -35,7 +35,7 @@ KNL_LFLAGS = #-lmemkind
 #include 
 CXXFLAGS += -I./include
 
-all: mpicsr4mlem mpicsr4mlem2 openmpcsr4mlem laikcsr4mlem #laikcsr4mlem-repart csr4gen singen
+all: mpicsr4mlem mpicsr4mlem2 openmpcsr4mlem laikcsr4mlem laikcsr4mlem-repart csr4gen singen
 
 mpicsr4mlem: mpicsr4mlem.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem.o $(OBJECTS)
@@ -47,6 +47,8 @@ mpicsr4mlem2.o: src/mpicsr4mlem2.cpp
 	$(MPICXX) $(KNL_CFLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
 
 laikcsr4mlem: src/laikcsr4mlem.cpp $(OBJECTS)
+	$(MPICXX) -g -O3 $(CXXFLAGS) $< $(LAIK_INC) -Wall -DUSE_MPI=1 -fopenmp -Wl,-rpath,$(abspath $(LAIK_ROOT)) $(LAIK_LIB) $(OBJECTS) -o $@
+laikcsr4mlem-repart: src/laikcsr4mlem-repart.cpp $(OBJECTS)
 	$(MPICXX) -g -O3 $(CXXFLAGS) $< $(LAIK_INC) -Wall -DUSE_MPI=1 -fopenmp -Wl,-rpath,$(abspath $(LAIK_ROOT)) $(LAIK_LIB) $(OBJECTS) -o $@
 
 #PURE OpenMP Version
