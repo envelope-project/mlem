@@ -7,14 +7,26 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - LAIK Version, HPC Optimization: Josef Weidendorfer, Tilman Kuestner
 - LAIK Version, Measurements, HPC Optimizations: Dai Yang, Tilman Kuestner
 - The new Hybrid and OpenMP version: Rami Al-Rihawi
+- GPU version
 - Generators: Thorsten Fuchs
 
+## Artifacts and Dependencies
+| Name        | MPI           | OpenMP  |  LAIK | Others|Description|
+| ------------- |:-------------:|:-----:|:--:|:--:|:--|
+| openmpcsr4mlem| no | yes | no | | Pure, native OpenMP Implementation.|
+| openmpcsr4mlem-pin| no | yes | no | | NUMA - Optimized OpenMP Version using thread Pinning |
+| openmpcsr4mlem-knl | no | yes | no | numactl, memkind | Special Optimized version for Intel© Xeon Phi© Knight's Landing (KNL) Processors |
+| mpicsr4mlem     | yes | no | no | | Pure MPI Implementation | 
+| mpicsr4mlem2 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning |
+| laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. 
+
+
 ## Dependencies
-- [libb0ost 1.58](http://boost.org/), for the iterators and program options.
-- C++ 11, GNU Compiler
+- [Boost Program Options](http://boost.org/), for the iterators and program options.
+- C++11 compatible, preferable GNU Compiler
 - OpenMP Support
-- libconfig++
-- [LAIK Library](https://github.com/envelope-project/laik)
+- libconfig++ (for the Matrix Generator only)
+- [LAIK Library](https://github.com/envelope-project/laik) (for LAIK Version only)
 
 ## Usage
 Different versions are supplied within this repository. 
@@ -30,7 +42,7 @@ Different versions are supplied within this repository.
 
 ### Compile
 ```sh
- make
+ make $TARGET
 ```
 ### Generate a Sparse Matrix for Testing
 ```sh
@@ -62,6 +74,9 @@ mpirun -np 4 ./laikcsr4mlem test.csr4 sino65536.sino mlem-60.out 60 0
 Any publication using the MLEM code must be informed to the authors of this code, e.g. Tilman Küstner.
 - Original MLEM paper: L. A. Shepp and Y. Vardi, "Maximum Likelihood Reconstruction for Emission Tomography," in IEEE Transactions on Medical Imaging, vol. 1, no. 2, pp. 113-122, Oct. 1982. doi: 10.1109/TMI.1982.4307558 [Link](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4307558&isnumber=4307552)
 - "Parallel MLEM on Multicore Architectures", Tilman Küstner, Josef Weidendorfer, Jasmine Schirmer, Tobias Klug, Carsten Trinitis, Sibylle I. Ziegler. In: Computational Science - ICCS 2009, LNCS, vol. 5544, pp. 491-500, Springer, 2009. [Link](http://www.springerlink.com/content/x2226771p5779h34/)
+- "Enabling Application-Integrated Proactive Fault Tolerance", Yang, D., Weidendorfer, J., Trinitis, C., Küstner, T., & Ziegler, S. (2018). In  Parallel Computing is Everywhere 32 (pp. 475-484). [Link](https://books.google.de/books?id=ysFVDwAAQBAJ&lpg=PA475&ots=k57wIk8a4x&dq=Dai%20Yang%20laik&lr&pg=PA475#v=onepage&q&f=false)
+- "Implementation and Evaluation of MLEM algorithm on Intel Xeon Phi Knights Landing (KNL) Processors", Rami Al-Rihawi, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1455603)
+- "Implementation and Evaluation of MLEM-Algorithm on GPU using CUDA", Apoorva Gupta, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1443203)
 
 ## License
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.

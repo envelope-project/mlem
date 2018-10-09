@@ -35,7 +35,7 @@ KNL_LFLAGS = #-lmemkind
 #include 
 CXXFLAGS += -I./include
 
-all: mpicsr4mlem mpicsr4mlem2 openmpcsr4mlem laikcsr4mlem csr4gen singen
+all: mpicsr4mlem mpicsr4mlem2 openmpcsr4mlem laikcsr4mlem laikcsr4mlem-repart csr4gen singen
 
 mpicsr4mlem: mpicsr4mlem.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem.o $(OBJECTS)
