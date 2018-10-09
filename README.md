@@ -77,6 +77,7 @@ Any publication using the MLEM code must be informed to the authors of this code
 - "Enabling Application-Integrated Proactive Fault Tolerance", Yang, D., Weidendorfer, J., Trinitis, C., Küstner, T., & Ziegler, S. (2018). In  Parallel Computing is Everywhere 32 (pp. 475-484). [Link](https://books.google.de/books?id=ysFVDwAAQBAJ&lpg=PA475&ots=k57wIk8a4x&dq=Dai%20Yang%20laik&lr&pg=PA475#v=onepage&q&f=false)
 - "Implementation and Evaluation of MLEM algorithm on Intel Xeon Phi Knights Landing (KNL) Processors", Rami Al-Rihawi, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1455603)
 - "Implementation and Evaluation of MLEM-Algorithm on GPU using CUDA", Apoorva Gupta, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1443203)
+- "Co-Scheduling in a Task-Based Programming Model", T. Becker, D. Yang, T. Kuestner, M. Schulz. In Proceedings of the 3rd Workshop on Co-Scheduling of HPC Applications (COSH 2018). DOI: 10.14459/2018md1428536.
 
 ## License
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.
