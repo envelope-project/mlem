@@ -1,0 +1,32 @@
+language: cpp
+sudo: required
+dist: xenial
+compiler:
+- gcc
+os: linux
+  addons:
+        apt:
+          sources:
+            - libboost-program-options-dev
+            - libopenmpi-dev
+          packages:
+            - g++-8
+before_install:
+  - apt update && apt -y install make libboost-program-options-dev libopenmpi-dev git
+  - git clone https://github.com/envelope-project/laik
+  - cd laik
+  - git checkout e504385
+  - ./configure
+  - make -j
+  - cd ..
+
+script:
+  - make mpicsr4mlem
+  - make laikcsr4mlem-repart
+  - make laikcsr4mlem
+  - make openmpcsr4mlem
+branches:
+  only:
+  - master
+notifications:
+  email: false
