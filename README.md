@@ -18,7 +18,7 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 | mpicsr4mlem     | yes | no | no | | Pure MPI Implementation | 
 | mpicsr4mlem2 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning |
 | mpicsr4mlem3 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning, HBM Optimization and Cache Blocking |
-| mpicsr4mlem3 | no | yes      |  no | CUDA + NCCL| High Performance CUDA implementation with OpenMP acceleration
+| cudacsr4mlem | no | yes      |  no | CUDA + NCCL| High Performance CUDA implementation with OpenMP acceleration
 | laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit a96769f193b32ee6196e28a7c554259f9bd749ef of LAIK. |
 
 
