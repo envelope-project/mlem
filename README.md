@@ -18,7 +18,7 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 | mpicsr4mlem     | yes | no | no | | Pure MPI Implementation | 
 | mpicsr4mlem2 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning |
 | mpicsr4mlem3 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning, HBM Optimization and Cache Blocking |
-| laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit e504385 of LAIK. |
+| laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit a96769f193b32ee6196e28a7c554259f9bd749ef of LAIK. |
 
 
 ## Dependencies
@@ -71,6 +71,6 @@ Any publication using the MLEM code must be informed to the authors of this code
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.
 
 ## Acknowledgement
-This project is partially financed by project ENVELOPE, which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
+This project is partially financed by project [ENVELOPE](http://envelope.itec.kit.edu), which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
 
-Compute Resources for development and testing is partially sponsored by the  Supercomputing Centre.
+Compute Resources for development and testing is partially sponsored by the Leibniz Supercomputing Centre ([LRZ](https://www.lrz.de)).
