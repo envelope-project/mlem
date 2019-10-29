@@ -2,16 +2,19 @@ CXX     = g++
 CC		= gcc
 MPICXX	= mpicxx
 mpicc 	= mpicc
+NVCC	= nvcc
 
 RM      = rm -f
 
 #-include Makefile.config
 
-CXXFLAGS  = -std=c++11 -O3 -fstrict-aliasing -L/usr/local/bin
-LDFLAGS  = -O3
-SOURCES = src/csr4matrix.cpp src/scannerconfig.cpp
-HEADERS = $(wildcard include/*.hpp)
-OBJECTS = $(SOURCES:%.cpp=%.o)
+CXXFLAGS	= -std=c++11 -O3
+LDFLAGS		= -O3
+SOURCES		= src/csr4matrix.cpp src/scannerconfig.cpp
+HEADERS		= $(wildcard include/*.hpp)
+OBJECTS 	= $(SOURCES:%.cpp=%.o)
+CULDFLAGS 	= -lcublas -lcusparse -lnvidia-ml -lnccl
+CUCXXFLAGS	= -Xcompiler
 
 MESSUNG_FLAG = #-DMESSUNG
 CXXFLAGS += $(MESSUNG_FLAG)
@@ -35,7 +38,7 @@ KNL_LFLAGS = #-lmemkind
 #include 
 CXXFLAGS += -I./include
 
-all: mpicsr4mlem mpicsr4mlem2 mpicsr4mlem3 openmpcsr4mlem laikcsr4mlem
+all: mpicsr4mlem mpicsr4mlem2 mpicsr4mlem3 openmpcsr4mlem laikcsr4mlem cudacsr4mlem
 
 mpicsr4mlem: mpicsr4mlem.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem.o $(OBJECTS)
@@ -72,11 +75,21 @@ fusedmpimlem: fusedmpimlem.o profiling.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ fusedmpimlem.o profiling.o $(OBJECTS)
 fusedmpimlem.o: src/fusedmpimlem.cpp
 	$(MPICXX) $(OMP_FLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
-
 mpicsr4mlem3: mpicsr4mlem3.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem3.o $(OBJECTS)
 mpicsr4mlem3.o: src/mpicsr4mlem3.cpp
 	$(MPICXX) $(OMP_FLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
+
+
+# CUDA GPU Version
+cudacsr4mlem: cudacsr4mlem.o cudacsr4mlemkernel.o $(OBJECTS)
+	$(NVCC) $(CUCXXFLAGS) $(OMP_FLAGS) $(CULDFLAGS) $(LFLAGS) $(DEFS) -o $@ cudacsr4mlem.o cudacsr4mlemkernel.o $(OBJECTS) $(CUDA_OBJECTS) 
+cudacsr4mlem.o: src/cudacsr4mlem.cu
+	$(NVCC) $(CUCXXFLAGS) $(OMP_FLAGS) $(CXXFLAGS) $(CFLAGS) $(DEFS) -I./include -o $@  -c $<
+cudacsr4mlemkernel.o: src/cudacsr4mlemkernel.cu
+	$(NVCC) $(CUCXXFLAGS) $(OMP_FLAGS) $(CXXFLAGS) $(CFLAGS) $(DEFS) -I./include -o $@ -c $<
+
+
 
 #objects
 %.o: src/%.cpp

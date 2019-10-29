@@ -7,7 +7,7 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - LAIK Version, HPC Optimization: Josef Weidendorfer, Tilman Kuestner
 - LAIK Version, Measurements, HPC Optimizations: Dai Yang, Tilman Kuestner
 - The new Hybrid and OpenMP version: Rami Al-Rihawi, Tilman Kuestner, Dai Yang
-- GPU version: Apporva Gupta, Mengdi Wang, Dai Yang
+- CUDA version: Apporva Gupta, Mengdi Wang, Dai Yang
 
 ## Artifacts and Dependencies
 | Name        | MPI           | OpenMP  |  LAIK | Others|Description|
@@ -18,6 +18,7 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 | mpicsr4mlem     | yes | no | no | | Pure MPI Implementation | 
 | mpicsr4mlem2 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning |
 | mpicsr4mlem3 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning, HBM Optimization and Cache Blocking |
+| mpicsr4mlem3 | no | yes      |  no | CUDA + NCCL| High Performance CUDA implementation with OpenMP acceleration
 | laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit a96769f193b32ee6196e28a7c554259f9bd749ef of LAIK. |
 
 
@@ -25,7 +26,8 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - [Boost Program Options](http://boost.org/), for the iterators and program options.
 - C++11 compatible, preferable GNU Compiler
 - OpenMP Support
-- [LAIK Library](https://github.com/envelope-project/laik) (for LAIK Version only)
+- For LAIK version, in addition: [LAIK Library](https://github.com/envelope-project/laik) 
+- For CUDA Version, in addition: [CUDA 10](https://developer.nvidia.com/cuda-toolkit), [NVIDIA Collective Communication Library](https://developer.nvidia.com/nccl), cuSparse, cuBlas, spTrans
 - MLEM Data Sets, optainable at TUM University Library, t.b.d. 
 
 
@@ -66,10 +68,14 @@ Any publication using the MLEM code must be informed to the authors of this code
 - " Exploring high bandwidth memory for PET Image Reconstruction", Dai Yang, Tilman Küstner, Rami Al-Rihawi, Martin Schulz (2019). In Parallel Computing (ParCo 19'). Accepted for Publication. [Link t.b.d.]()
 
 
-## License
+## License and Legal
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.
 
-## Acknowledgement
+The CSR Matrix transposition routine ([spTrans](https://github.com/vtsynergy/sptrans)) in `cudacsr4mlem` is provided as an open-source software by Virginia Polytechnic Institute & State University (Virginia Tech) under the [GNU Lesser General Public License v2.1](https://github.com/vtsynergy/sptrans/blob/master/LICENSE).
+
+## Acknowledgement 
 This project is partially financed by project [ENVELOPE](http://envelope.itec.kit.edu), which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
 
 Compute Resources for development and testing is partially sponsored by the Leibniz Supercomputing Centre ([LRZ](https://www.lrz.de)).
+
+spTrans is provided by Wang et al., originally published as Parallel Transposition of Sparse Data Structures. Hao Wang, Weifeng Liu, Kaixi Hou, Wu-chun Feng. In Proceedings of the 30th International Conference on Supercomputing (ICS), Istanbul, Turkey, June 2016.
