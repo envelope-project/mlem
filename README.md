@@ -6,9 +6,8 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - Initial Verison and Algorithmic, MPI Version: Tilman Kuestner
 - LAIK Version, HPC Optimization: Josef Weidendorfer, Tilman Kuestner
 - LAIK Version, Measurements, HPC Optimizations: Dai Yang, Tilman Kuestner
-- The new Hybrid and OpenMP version: Rami Al-Rihawi
-- GPU version
-- Generators: Thorsten Fuchs
+- The new Hybrid and OpenMP version: Rami Al-Rihawi, Tilman Kuestner, Dai Yang
+- GPU version: Apporva Gupta, Mengdi Wang, Dai Yang
 
 ## Artifacts and Dependencies
 | Name        | MPI           | OpenMP  |  LAIK | Others|Description|
@@ -18,7 +17,8 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 | openmpcsr4mlem-knl | no | yes | no | numactl, memkind | Special Optimized version for Intel© Xeon Phi© Knight's Landing (KNL) Processors |
 | mpicsr4mlem     | yes | no | no | | Pure MPI Implementation | 
 | mpicsr4mlem2 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning |
-| laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. 
+| mpicsr4mlem3 | yes | yes      |  no | | Hybrid MPI-OpenMP Implementation with Thread Pinning, HBM Optimization and Cache Blocking |
+| laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit e504385 of LAIK. |
 
 
 ## Dependencies
@@ -27,27 +27,12 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - OpenMP Support
 - libconfig++ (for the Matrix Generator only)
 - [LAIK Library](https://github.com/envelope-project/laik) (for LAIK Version only)
-
-## Usage
-Different versions are supplied within this repository. 
-- mpicsr4mlem: a hybrid MPI+OpenMP Version without LAIK support.
-- laikcsr4mlem: the LAIK version without repartitioning support and optimized load balancing
-- openmpcsr4mlem: a pure OpenMP Version of MLEM
-- openmpcsr4mlem-pin: OpenMP explicit thread pinned version of MLEM
-- openmpcsr4mlem-knl: Intel Knight's Landing Architecture optimized version of MLEM
-- laikcsr4mlem-repart: LAIK version with explicit repartitioning. 
-- csr4gen/csr4gen: The CSR (Compressed Sparse Rows) matrix generator. 
-- singen/singen: The sinogram (image raw data) generator. 
+- MLEM Data Sets, optainable at TUM University Library, t.b.d. 
 
 
 ### Compile
 ```sh
  make $TARGET
-```
-### Generate a Sparse Matrix for Testing
-```sh
-./csr4gen/csr4gen -c ./examples/madpet2.cfg -d 0.01 -v 0.1 -f test.csr4
-./singen/singen 65536
 ```
 ### Run the nativ MPI Version
 ```sh
@@ -77,11 +62,15 @@ Any publication using the MLEM code must be informed to the authors of this code
 - "Enabling Application-Integrated Proactive Fault Tolerance", Yang, D., Weidendorfer, J., Trinitis, C., Küstner, T., & Ziegler, S. (2018). In  Parallel Computing is Everywhere 32 (pp. 475-484). [Link](https://books.google.de/books?id=ysFVDwAAQBAJ&lpg=PA475&ots=k57wIk8a4x&dq=Dai%20Yang%20laik&lr&pg=PA475#v=onepage&q&f=false)
 - "Implementation and Evaluation of MLEM algorithm on Intel Xeon Phi Knights Landing (KNL) Processors", Rami Al-Rihawi, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1455603)
 - "Implementation and Evaluation of MLEM-Algorithm on GPU using CUDA", Apoorva Gupta, Master's Thesis (2018). [Link](https://mediatum.ub.tum.de/1443203)
-- "Co-Scheduling in a Task-Based Programming Model", T. Becker, D. Yang, T. Kuestner, M. Schulz. In Proceedings of the 3rd Workshop on Co-Scheduling of HPC Applications (COSH 2018). DOI: 10.14459/2018md1428536.
+- "Co-Scheduling in a Task-Based Programming Model", T. Becker, D. Yang, T. Kuestner, M. Schulz. In Proceedings of the 3rd Workshop on Co-Scheduling of HPC Applications (COSH 2018). DOI: [10.14459/2018md1428536](https://mediatum.ub.tum.de/1428536).
+- "Porting MLEM Algorithm for Heterogeneous Systems", Mengdi Wang, Bachelor's Thesis (2019). [Link](https://mediatum.ub.tum.de/1518886)
+- " Exploring high bandwidth memory for PET Image Reconstruction", Dai Yang, Tilman Küstner, Rami Al-Rihawi, Martin Schulz (2019). In Parallel Computing (ParCo 19'). Accepted for Publication. [Link t.b.d.]()
+
 
 ## License
 This code is distributed as a open source project under GPL License Version 3. Please refer to LICENSE document.
 
 ## Acknowledgement
 This project is partially financed by project ENVELOPE, which is supported by Federal Ministry of Education and Research (BMBF) of the Federal Republic of Germany. 
-Development of the KNL and testing is partially funded by the Liebniz Supercomputing Centre 
+
+Compute Resources for development and testing is partially sponsored by the  Supercomputing Centre.

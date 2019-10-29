@@ -1,25 +1,6 @@
-/**
-    Copyright © 2017 Technische Universitaet Muenchen
-    Authors: Tilman Kuestner
-           Dai Yang
-           Josef Weidendorfer
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
-    OTHER DEALINGS IN THE SOFTWARE.
-
-    The above copyright notice and this permission notice shall be 
-    included in all copies and/or substantial portions of the Software,
-    including binaries.
-*/
-
 #include "../include/csr4matrix.hpp"
 #include "../include/vector.hpp"
+
 
 extern "C" {
 #include "laik-backend-mpi.h"
@@ -401,22 +382,27 @@ void mlem(Laik_Instance* inst, Laik_Group* world, Laik_Partitioning* part,
 {
     uint32_t nRows = matrix.rows();
     uint32_t nColumns = matrix.columns();
+    
     std::chrono::duration<float> compute_time, total_time;
 
+    //workaround for laik bug
+    char* str_fwp = "fwproj";
+    char* str_norm = "norm";
+    char* str_update = "update";
     // Allocate temporary vectors
     Laik_Data* fwproj = laik_new_data_1d(inst, laik_Float, nRows);
-    laik_data_set_name (fwproj, "fwProj");
+    laik_data_set_name (fwproj, str_fwp);
     laik_switchto_new_partitioning(fwproj, world, laik_All, LAIK_DF_None, LAIK_RO_None);
 
     Vector<float> correlation(nRows, 0.0);
 
     Laik_Data* update = laik_new_data_1d(inst, laik_Float, nColumns);
-    laik_data_set_name(update, "update");
+    laik_data_set_name(update, str_update);
     laik_switchto_new_partitioning(update, world, laik_All, LAIK_DF_None, LAIK_RO_None);
 
     // Calculate column sums ("norm")
     Laik_Data* norm = laik_new_data_1d(inst, laik_Float, nColumns);
-    laik_data_set_name(norm, "norm");
+    laik_data_set_name(norm, str_norm);
     laik_switchto_new_partitioning(norm, world, laik_All, LAIK_DF_None, LAIK_RO_None);
 
     // Set "all" partitionings for data containers: only for reductions

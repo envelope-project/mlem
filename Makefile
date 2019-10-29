@@ -7,8 +7,8 @@ RM      = rm -f
 
 #-include Makefile.config
 
-CXXFLAGS  = -Wall -std=c++11 -O3 -fstrict-aliasing -L/usr/local/bin
-LDFLAGS  = -Wall -O3
+CXXFLAGS  = -std=c++11 -O3 -fstrict-aliasing -L/usr/local/bin
+LDFLAGS  = -O3
 SOURCES = src/csr4matrix.cpp src/scannerconfig.cpp
 HEADERS = $(wildcard include/*.hpp)
 OBJECTS = $(SOURCES:%.cpp=%.o)
@@ -26,7 +26,7 @@ CXXFLAGS += $(BOOST_INC)
 
 #openmp
 OMP_FLAGS = -fopenmp
-PIN_CFLAGS = -D_PINNING_
+PIN_CFLAGS = -D_PINNING_ -D_OMP_
 
 # GGF. XEON-PHI
 KNL_CFLAGS = #-DXEON_PHI 
@@ -35,7 +35,7 @@ KNL_LFLAGS = #-lmemkind
 #include 
 CXXFLAGS += -I./include
 
-all: mpicsr4mlem mpicsr4mlem2 openmpcsr4mlem laikcsr4mlem laikcsr4mlem-repart csr4gen singen
+all: mpicsr4mlem mpicsr4mlem2 mpicsr4mlem3 openmpcsr4mlem laikcsr4mlem
 
 mpicsr4mlem: mpicsr4mlem.o $(OBJECTS)
 	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem.o $(OBJECTS)
@@ -46,8 +46,10 @@ mpicsr4mlem2: mpicsr4mlem2.o $(OBJECTS)
 mpicsr4mlem2.o: src/mpicsr4mlem2.cpp
 	$(MPICXX) $(KNL_CFLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
 
+# "LAIK" Version 
 laikcsr4mlem: src/laikcsr4mlem.cpp $(OBJECTS)
 	$(MPICXX) -g -O3 $(CXXFLAGS) $< $(LAIK_INC) -Wall -DUSE_MPI=1 -fopenmp -Wl,-rpath,$(abspath $(LAIK_ROOT)) $(LAIK_LIB) $(OBJECTS) -o $@
+
 
 #PURE OpenMP Version
 openmpcsr4mlem: openmpcsr4mlem.o $(OBJECTS)
@@ -65,17 +67,25 @@ openmpcsr4mlem-knl: openmpcsr4mlem-knl.o $(OBJECTS)
 openmpcsr4mlem-knl.o: src/openmpcsr4mlem.cpp
 	$(CXX) $(CXXFLAGS) $(DEFS) $(KNL_CFLAGS) $(OMP_FLAGS) -o $@ -c $<
 
+# Hybrid Version of MLEM
+fusedmpimlem: fusedmpimlem.o profiling.o $(OBJECTS)
+	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ fusedmpimlem.o profiling.o $(OBJECTS)
+fusedmpimlem.o: src/fusedmpimlem.cpp
+	$(MPICXX) $(OMP_FLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
+
+mpicsr4mlem3: mpicsr4mlem3.o $(OBJECTS)
+	$(MPICXX) $(LFLAGS) $(DEFS) $(OMP_FLAGS) $(DEFS) $(OMP_FLAGS) -o $@ mpicsr4mlem3.o $(OBJECTS)
+mpicsr4mlem3.o: src/mpicsr4mlem3.cpp
+	$(MPICXX) $(OMP_FLAGS) $(CXXFLAGS) $(DEFS) $(OMP_FLAGS) -o $@ -c $<
+
+#objects
 %.o: src/%.cpp
-	$(CC) $(CXXFLAGS) $(DEFS) -o $@ -c $< 
-
-csr4gen: 
-	+cd csrgen && make
-
-singen:
-	+cd singen && make
+	$(CXX) $(CXXFLAGS) $(DEFS) -o $@ -c $< 
+profiling.o: src/profiling.c
+	$(CC) $(CFLAGS) $(DEFS) -o $@ -c $< 
 
 clean:
-	$(RM) *.o mpicsr4mlem laikcsr4mlem laikcsr4mlem-repart
-	cd csrgen && make clean
-	cd singen && make clean
+	$(RM) src/*.o
+	$(RM) *.o *csr4mlem*
+	$(RM) -r *.dSYM
 
