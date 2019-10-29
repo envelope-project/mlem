@@ -25,7 +25,6 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 - [Boost Program Options](http://boost.org/), for the iterators and program options.
 - C++11 compatible, preferable GNU Compiler
 - OpenMP Support
-- libconfig++ (for the Matrix Generator only)
 - [LAIK Library](https://github.com/envelope-project/laik) (for LAIK Version only)
 - MLEM Data Sets, optainable at TUM University Library, t.b.d. 
 
