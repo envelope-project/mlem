@@ -21,6 +21,12 @@ The efficient use of multicore architectures for sparse matrix-vector multiplica
 | cudacsr4mlem | no | yes      |  no | CUDA + NCCL| High Performance CUDA implementation with OpenMP acceleration
 | laikcsr4mlem | yes  | no | yes |  | MLEM ported to LAIK to enable application-integrated Fault Tolerance. Tested with commit a96769f193b32ee6196e28a7c554259f9bd749ef of LAIK. |
 
+## Reference Data Sets
+For experiments and publications with MLEM, two different data sets are provided.
+These dataset are simimulated PET scanners using the DRF method with artifical scanner configurations that are close to real-life settings, however, they do not represent real-world scanners, so they should be used for evaluation purpose only. 
+
+- [~12GB Dataset](https://mediatum.ub.tum.de/1523001)
+- [~90GB Dataset](https://mediatum.ub.tum.de/1523005)
 
 ## Dependencies
 - [Boost Program Options](http://boost.org/), for the iterators and program options.
