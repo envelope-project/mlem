@@ -55,7 +55,11 @@ mpirun -np <num_tasks> ./laikcsr4mlem <matrix> <input> <output> <iterations>
 ```
 ### LAIK example
 ```sh
-mpirun -np 4 ./laikcsr4mlem test.csr4 sino65536.sino mlem-60.out 60 0
+LAIK_LOG=2:0 mpirun -np 4 ./laikcsr4mlem test.csr4 sino65536.sino mlem-60.out 60
+```
+To test the repartitioning part, try:
+```sh
+SHRINK_ITER=5 SHRINK_FROM=10 SHRINK_TO=9 REPART_TYPE=2 LAIK_LOG=2:0 mpirun -np 10 ./laikcsr4mlem matrix.csr4 input.LMsino /dev/null 10
 ```
 
 ## Build Flags:
