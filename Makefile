@@ -52,7 +52,8 @@ mpicsr4mlem2.o: src/mpicsr4mlem2.cpp
 # "LAIK" Version 
 laikcsr4mlem: src/laikcsr4mlem.cpp $(OBJECTS)
 	$(MPICXX) -g -O3 $(CXXFLAGS) $< $(LAIK_INC) -Wall -DUSE_MPI=1 -fopenmp -Wl,-rpath,$(abspath $(LAIK_ROOT)) $(LAIK_LIB) $(OBJECTS) -o $@
-
+laikcsr4mlem-repart: src/laikcsr4mlem-repart.cpp $(OBJECTS)
+	$(MPICXX) -g -O3 $(CXXFLAGS) $< $(LAIK_INC) -Wall -DUSE_MPI=1 -fopenmp -Wl,-rpath,$(abspath $(LAIK_ROOT)) $(LAIK_LIB) $(OBJECTS) -o $@
 
 #PURE OpenMP Version
 openmpcsr4mlem: openmpcsr4mlem.o $(OBJECTS)
